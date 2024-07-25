@@ -95,11 +95,11 @@ def val_one_fold(fold, test_loader, col_names, axis):
     gt_rows = []
 
     with torch.no_grad():
-        for series_stack, volume_labels, frame_labels, patient_ids in tqdm(test_loader):   
+        for series_stack, volume_labels, _, frame_labels, __, patient_ids in tqdm(test_loader):   
             series_stack = series_stack.to(device_id).float()
             volume_labels = volume_labels.to(device_id).long()
 
-            volume_logits, image_logits = model(series_stack)
+            volume_logits, image_logits, _ = model(series_stack)
             for i in range(volume_logits.shape[1]):
                 prob = torch.nn.Softmax(dim=1)(volume_logits[:, i, :])
                 study_id = patient_ids[i].item()
@@ -120,10 +120,12 @@ def val_one_fold(fold, test_loader, col_names, axis):
     pred_df = pd.DataFrame.from_dict(pred_rows) 
     
     gt_df = pd.DataFrame.from_dict(gt_rows) 
-    lb_loss = score(gt_df, pred_df, "row_id", 1.0)
-    print("lb loss: ", lb_loss)
+    
+    
     pred_df.to_csv('results/pred_{}_fold{}.csv'.format(default_configs["a_name"], fold), index=False)
     gt_df.to_csv('results/gt_{}_fold{}.csv'.format(default_configs["a_name"], fold), index=False)
+    lb_loss = score(gt_df, pred_df, "row_id", 1.0)
+    print("lb loss: ", lb_loss)
 
 
 if __name__ == '__main__':
@@ -139,7 +141,7 @@ if __name__ == '__main__':
 
     DATA_PATH = "train"
     
-    folds = [0, 1, 2, 3, 4]
+    folds = [0, 1, 2]
     n_fold = len(folds)
 
  
@@ -160,7 +162,7 @@ if __name__ == '__main__':
             test_data = ImageFolder(val_df, col_names, axis, default_configs, "test")
             # test_data_2 = ImageFolder(val_df, DATA_PATH, default_configs["image_size"], 11, "test", None)
             
-            test_loader = DataLoader(test_data, batch_size=int(default_configs["batch_size"]), 
+            test_loader = DataLoader(test_data, batch_size=int(default_configs["batch_size"]//4), 
                     pin_memory=True, num_workers=default_configs["num_workers"], drop_last=False)
     
             val_one_fold(fold, test_loader, col_names, axis) 

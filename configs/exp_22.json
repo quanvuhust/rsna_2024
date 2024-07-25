@@ -1,5 +1,5 @@
 {
-  "a_name": "exp_21",
+  "a_name": "exp_22",
   "a_description": "rsna 8 eval",
   "batch_size": 8,
   "num_workers": 8,

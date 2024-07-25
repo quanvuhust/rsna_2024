@@ -195,28 +195,45 @@ def train_one_fold(fold, train_loader, test_loader, rank, num_tasks, col_names, 
         updates_per_epoch = (len(train_loader) + default_configs["accumulation_steps"] - 1) // default_configs["accumulation_steps"]
         num_updates = epoch * updates_per_epoch
         loss_volume_train = 0; loss_obj_train = 0; loss_coord_train = 0; loss_any_train = 0
-        for series_stacks, volume_labels, any_labels, frame_labels, heat_map_labels, img_paths in tqdm(train_loader):
+        for series_stacks_ax, series_stacks_sat2, series_stacks_sat1, volume_labels, any_labels, frame_labels, img_paths in tqdm(train_loader):
             ddp_model.train()
-            series_stacks = series_stacks.to(device_id).float()
+            series_stacks_sat2 = series_stacks_sat2.to(device_id).float()
+            series_stacks_ax = series_stacks_ax.to(device_id).float()
+            series_stacks_sat1 = series_stacks_sat1.to(device_id).float()
             frame_labels = frame_labels.to(device_id).float()
-            heat_map_labels = heat_map_labels.to(device_id).float()
+            # heat_map_labels = heat_map_labels.to(device_id).float()
             
             any_labels = any_labels.to(device_id).long()
             volume_labels = volume_labels.to(device_id).long()
             # print("HEHE: ", series_stacks.shape, frame_labels.shape, volume_labels.shape)
             if torch.rand(1)[0] < 0.5 and default_configs["use_mixup"]:
-                mix_series_stacks, volume_target_a, volume_target_b, frame_target_a, frame_target_b, heat_map_labels_a, heat_map_labels_b, lam = mixup(series_stacks, volume_labels, frame_labels, heat_map_labels, alpha=default_configs["mixup_alpha"])
+                mix_series_stacks_ax, mix_series_stacks_sat2, mix_series_stacks_sat1, volume_target_a, volume_target_b, frame_target_a, frame_target_b, lam = mixup(series_stacks_ax, series_stacks_sat2, series_stacks_sat1, volume_labels, frame_labels, alpha=default_configs["mixup_alpha"])
                 frame_target_a = frame_target_a.view(frame_target_a.shape[0] * frame_target_a.shape[1], frame_target_a.shape[2])
                 frame_target_b = frame_target_b.view(frame_target_b.shape[0] * frame_target_b.shape[1], frame_target_b.shape[2])
-                heat_map_labels_a = heat_map_labels_a.view(heat_map_labels_a.shape[0] * heat_map_labels_a.shape[1], heat_map_labels_a.shape[2])
-                heat_map_labels_b = heat_map_labels_b.view(heat_map_labels_b.shape[0] * heat_map_labels_b.shape[1], heat_map_labels_b.shape[2])
+                # heat_map_labels_a = heat_map_labels_a.view(heat_map_labels_a.shape[0] * heat_map_labels_a.shape[1], heat_map_labels_a.shape[2])
+                # heat_map_labels_b = heat_map_labels_b.view(heat_map_labels_b.shape[0] * heat_map_labels_b.shape[1], heat_map_labels_b.shape[2])
                 with torch.cuda.amp.autocast():
-                    volume_logits, image_logits, heat_maps = ddp_model(mix_series_stacks)
-                    loss_volume = 0
-                    for i_head in range(volume_logits.shape[0]):
-                        loss_volume += lam*volume_criterion(volume_logits[i_head], volume_target_a[:,i_head]) + \
-                            (1-lam)*volume_criterion(volume_logits[i_head], volume_target_b[:,i_head])
-                    loss_volume = loss_volume/volume_logits.shape[0]
+                    volume_logits_3, image_logits = ddp_model(mix_series_stacks_ax, mix_series_stacks_sat2, mix_series_stacks_sat1)
+                    loss_volume_3 = 0
+                    for i_head in range(volume_logits_3.shape[0]):
+                        loss_volume_3 += lam*volume_criterion(volume_logits_3[i_head], volume_target_a[:,i_head]) + \
+                            (1-lam)*volume_criterion(volume_logits_3[i_head], volume_target_b[:,i_head])
+                    loss_volume_3 = loss_volume_3/volume_logits_3.shape[0]
+                    # loss_volume_0 = 0
+                    # for i_head in range(volume_logits_0.shape[0]):
+                    #     loss_volume_0 += lam*volume_criterion(volume_logits_0[i_head], volume_target_a[:,10+i_head]) + \
+                    #         (1-lam)*volume_criterion(volume_logits_0[i_head], volume_target_b[:,10+i_head])
+                    # loss_volume_0 = loss_volume_0/volume_logits_0.shape[0]
+                    # loss_volume_1 = 0
+                    # for i_head in range(volume_logits_1.shape[0]):
+                    #     if i_head < 10:
+                    #         loss_volume_1 += lam*volume_criterion(volume_logits_1[i_head], volume_target_a[:,i_head]) + \
+                    #             (1-lam)*volume_criterion(volume_logits_1[i_head], volume_target_b[:,i_head])
+                    #     else:
+                    #         loss_volume_1 += lam*volume_criterion(volume_logits_1[i_head], volume_target_a[:,20+i_head-10]) + \
+                    #             (1-lam)*volume_criterion(volume_logits_1[i_head], volume_target_b[:,20+i_head-10])
+                    # loss_volume_1 = loss_volume_1/volume_logits_1.shape[0]
+
                     loss_image = 0; loss_obj = 0; loss_coord = 0
                     
                     for i_head in range(image_logits.shape[0]):
@@ -232,11 +249,11 @@ def train_one_fold(fold, train_loader, test_loader, rank, num_tasks, col_names, 
                     # any_probs = torch.cat((1-any_probs, any_probs), dim=1)
                     # loss_any = lam*any_criterion(torch.log(any_probs), any_labels_a) + (1-lam)*any_criterion(torch.log(any_probs), any_labels_b)
                     # print("3: ", heat_map_labels_a.shape, heat_map_labels_b.shape)
-                    loss_heat_map = lam*heatmap_criterion(heat_maps, heat_map_labels_a) + (1-lam)*heatmap_criterion(heat_maps, heat_map_labels_b)
-                    loss = loss_volume + loss_image +  0.125*loss_heat_map
-                    loss_volume_train += loss_volume.item()
+                    # loss_heat_map = lam*heatmap_criterion(heat_maps, heat_map_labels_a) + (1-lam)*heatmap_criterion(heat_maps, heat_map_labels_b)
+                    loss = loss_volume_3 + loss_image
+                    loss_volume_train += loss_volume_3.item()
                     loss_obj_train += loss_obj.item()
-                    loss_coord_train += loss_heat_map.item()
+                    # loss_coord_train += loss_heat_map.item()
                     loss /= default_configs["accumulation_steps"]
                 scaler.scale(loss).backward()
                 
@@ -249,17 +266,24 @@ def train_one_fold(fold, train_loader, test_loader, rank, num_tasks, col_names, 
                     model_ema.update(ddp_model, step=num_updates)
             else:
                 frame_labels = frame_labels.view(frame_labels.shape[0] * frame_labels.shape[1], frame_labels.shape[2])
-                heat_map_labels = heat_map_labels.view(heat_map_labels.shape[0] * heat_map_labels.shape[1], heat_map_labels.shape[2])
+                # heat_map_labels = heat_map_labels.view(heat_map_labels.shape[0] * heat_map_labels.shape[1], heat_map_labels.shape[2])
                 with torch.cuda.amp.autocast():
-                    # bs, n_slice_per_c, in_chans, image_size, _ = series_stacks.shape
-                    # images = series_stacks.view(bs * n_slice_per_c, in_chans, image_size, image_size)
-                    # images = random_erase(images)
-                    # series_stacks = images.view(bs, n_slice_per_c, in_chans, image_size, image_size)
-                    volume_logits, image_logits, heat_maps = ddp_model(series_stacks)
-                    loss_volume = 0
-                    for i_head in range(volume_logits.shape[0]):
-                        loss_volume += volume_criterion(volume_logits[i_head], volume_labels[:,i_head])
-                    loss_volume = loss_volume/volume_logits.shape[0]
+                    volume_logits_3, image_logits = ddp_model(series_stacks_ax, series_stacks_sat2, series_stacks_sat1)
+                    # loss_volume_0 = 0
+                    # for i_head in range(volume_logits_0.shape[0]):
+                    #     loss_volume_0 += volume_criterion(volume_logits_0[i_head], volume_labels[:,10+i_head])
+                    # loss_volume_0 = loss_volume_0/volume_logits_0.shape[0]
+                    # loss_volume_1 = 0
+                    # for i_head in range(volume_logits_1.shape[0]):
+                    #     if i_head < 10:
+                    #         loss_volume_1 += volume_criterion(volume_logits_1[i_head], volume_labels[:,i_head])
+                    #     else:
+                    #         loss_volume_1 += volume_criterion(volume_logits_1[i_head], volume_labels[:,20+i_head-10])
+                    # loss_volume_1 = loss_volume_1/volume_logits_1.shape[0]
+                    loss_volume_3 = 0
+                    for i_head in range(volume_logits_3.shape[0]):
+                        loss_volume_3 += volume_criterion(volume_logits_3[i_head], volume_labels[:,i_head])
+                    loss_volume_3 = loss_volume_3/volume_logits_3.shape[0]
                     loss_image = 0; loss_obj = 0; loss_coord = 0
                     for i_head in range(image_logits.shape[0]):
                         loss_obj += obj_criterion(image_logits[i_head][:, 0], frame_labels[:,i_head])
@@ -272,13 +296,13 @@ def train_one_fold(fold, train_loader, test_loader, rank, num_tasks, col_names, 
                     # any_probs = any_probs.unsqueeze(1)
                     # any_probs = torch.cat((1-any_probs, any_probs), dim=1)
                     # # print(any_probs.shape, any_labels.shape, volume_labels.shape)
-                    loss_heat_map = heatmap_criterion(heat_maps, heat_map_labels)
+                    # loss_heat_map = heatmap_criterion(heat_maps, heat_map_labels)
                     
-                    loss = loss_volume + loss_image + 0.125*loss_heat_map
-                    loss_volume_train += loss_volume.item()
+                    loss = loss_volume_3 + loss_image
+                    loss_volume_train += loss_volume_3.item()
                     loss_obj_train += loss_obj.item()
                     # loss_any_train += loss_any.item()
-                    loss_coord_train += loss_heat_map.item()
+                    # loss_coord_train += loss_heat_map.item()
                     loss /= default_configs["accumulation_steps"]
                 scaler.scale(loss).backward()
                 if ((batch_idx + 1) % default_configs["accumulation_steps"] == 0) or ((batch_idx + 1) == len(train_loader)):
@@ -292,7 +316,7 @@ def train_one_fold(fold, train_loader, test_loader, rank, num_tasks, col_names, 
         print("Train volume loss: ", loss_volume_train/batch_idx)
         print("Train obj loss: ", loss_obj_train/batch_idx)
         # print("Train any loss: ", loss_any_train/batch_idx)
-        print("Train coord loss: ", loss_coord_train/batch_idx)
+        # print("Train coord loss: ", loss_coord_train/batch_idx)
         end = time.time()
         log_metric_mlflow(rank, "train_elapsed_time", end - start, step=epoch)
         if rank == 0:
@@ -431,4 +455,4 @@ if __name__ == '__main__':
                 mlflow.end_run()
         else:
             for fold in folds:
-                score = train_one_fold(fold, train_loader_list[fold], test_loader_list[fold], rank, num_tasks, col_names, axis) 
+                score = train_one_fold(fold, train_loader_list[fold], test_loader_list[fold], rank, num_tasks, col_names, axis)

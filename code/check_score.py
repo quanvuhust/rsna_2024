@@ -62,11 +62,11 @@ def score(
     for condition in ['spinal', 'foraminal', 'subarticular']:
         condition_indices = solution.loc[solution['condition'] == condition].index.values
         condition_loss = sklearn.metrics.log_loss(
-            y_true=solution.loc[condition_indices, target_levels].values[:, 2],
-            y_pred=submission.loc[condition_indices, target_levels].values[:, 2],
+            y_true=solution.loc[condition_indices, target_levels].values[:, 0],
+            y_pred=submission.loc[condition_indices, target_levels].values[:, 0],
             sample_weight=solution.loc[condition_indices, 'sample_weight'].values
         )
-        # print(solution.loc[condition_indices, target_levels].values.shape, submission.loc[condition_indices, target_levels].values.shape, solution.loc[condition_indices, 'sample_weight'].values.shape)
+        print(condition, condition_loss)
         condition_losses.append(condition_loss)
         condition_weights.append(1)
 
@@ -83,8 +83,11 @@ def score(
     condition_weights.append(any_severe_scalar)
     return np.average(condition_losses, weights=condition_weights)
 
-pred_df = pd.read_csv("/root/3d_model/results/submission.csv")
-gt_df = pd.read_csv("/root/3d_model/results/solution.csv")
+pred_df = pd.read_csv("/root/3d_model/results/pred_exp_21_fold0.csv")
+gt_df = pd.read_csv("/root/3d_model/results/gt_exp_21_fold0.csv")
+gt_df = gt_df[gt_df["row_id"].str.contains("l5_s1")]
+pred_df = pred_df[pred_df.row_id.isin(gt_df.row_id) ]
+# print(pred_df)
 # gt_df = pd.DataFrame.from_dict(gt_rows) 
 lb_loss = score(gt_df, pred_df, "row_id", 1.0)
 print("lb loss: ", lb_loss)

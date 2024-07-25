@@ -1,19 +1,20 @@
 import torch
 import numpy as np
 
-def mixup(x: torch.Tensor, y1: torch.Tensor, y2: torch.Tensor, y3: torch.Tensor, alpha: float = 1.0):
+def mixup(x1: torch.Tensor, x2: torch.Tensor, x3: torch.Tensor, y1: torch.Tensor, y2: torch.Tensor, alpha: float = 1.0):
     assert alpha > 0, "alpha should be larger than 0"
-    assert x.size(0) > 1, "Mixup cannot be applied to a single instance."
+    assert x1.size(0) > 1, "Mixup cannot be applied to a single instance."
 
     lam = np.random.beta(alpha, alpha)
-    rand_index = torch.randperm(x.size()[0])
-    mixed_x = lam * x + (1 - lam) * x[rand_index, :]
+    rand_index = torch.randperm(x1.size()[0])
+    mixed_x1 = lam * x1 + (1 - lam) * x1[rand_index, :]
+    mixed_x2 = lam * x2 + (1 - lam) * x2[rand_index, :]
+    mixed_x3 = lam * x3 + (1 - lam) * x3[rand_index, :]
     target_a_1, target_b_1 = y1, y1[rand_index]
     # print(y2.shape, rand_index)
     target_a_2, target_b_2 = y2, y2[rand_index]
-    target_a_3, target_b_3 = y3, y3[rand_index]
     # print("HEHE: ",target_a_1.shape, target_b_1.shape, target_a_2.shape, target_b_2.shape)
-    return mixed_x, target_a_1, target_b_1, target_a_2, target_b_2, target_a_3, target_b_3, lam
+    return mixed_x1, mixed_x2, mixed_x3, target_a_1, target_b_1, target_a_2, target_b_2, lam
 
 def rand_bbox(size, lam):
     W = size[2]
