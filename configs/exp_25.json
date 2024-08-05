@@ -1,9 +1,9 @@
 {
-  "a_name": "exp_23",
+  "a_name": "exp_25",
   "a_description": "rsna 8 eval",
   "batch_size": 8,
   "num_workers": 8,
-  "n_eval": 12,
+  "n_eval": 6,
   "image_size": 294,
   "accumulation_steps": 1,
   "smoothing_value": 0.0,

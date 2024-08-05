@@ -84,6 +84,8 @@ class Neck(nn.Module):
 class Model(nn.Module):
     def __init__(self, back_bone, n_head, device_id):
         super().__init__()
+        self.back_bone = back_bone
+
         self.model0 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
         self.model0.set_grad_checkpointing()
         self.model0.fc_norm = nn.Identity()
@@ -95,6 +97,7 @@ class Model(nn.Module):
         self.model1.fc_norm = nn.Identity()
         self.model1.head_drop = nn.Identity()
         self.model1.head = nn.Identity()
+
 
         # self.model2 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
         # self.model2.set_grad_checkpointing()
@@ -119,7 +122,7 @@ class Model(nn.Module):
                                     nn.Linear(feats, 1),
                                 ) for i in range(25)]).to(device_id)
         self.volume_heads_3 = nn.ModuleList([nn.Sequential(
-                                    nn.Dropout(0.1),
+                                    # nn.Dropout(0.1),
                                     SelfAttentionPooling(2*lstm_embed),
                                     nn.Linear(2*lstm_embed, 3),
                                 ) for i in range(n_head)]).to(device_id)
@@ -158,12 +161,11 @@ class Model(nn.Module):
         x2 = x2.reshape(bs * N_EVAL, in_chans, h2, w2)
         x = torch.cat([x1, x2], 0)
         # x = (x - self.IMAGENET_DEFAULT_MEAN[None,:, None, None])/self.IMAGENET_DEFAULT_STD[None,:, None, None]
-        
-        features_map0 = self.model0.forward_features(x0)
-        features0 = features_map0[:, 0]
+        features0 = self.model0.forward_features(x0)[:, 0]
         features = self.model1.forward_features(x)[:, 0]
         features1 = features[:bs * N_EVAL]
         features2 = features[bs * N_EVAL:]
+        # features2 = self.model2.forward_features(x2)[:, 0]
 
         # features_neck1 = torch.cat([features1, features2], 1)
         # features_neck0 = features0.view(bs, N_EVAL, -1)

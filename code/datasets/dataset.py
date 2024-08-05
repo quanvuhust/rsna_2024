@@ -62,14 +62,13 @@ class ImageFolder(data.Dataset):
         self.label_coordinates_df = pd.read_csv("data/train_label_coordinates.csv")
         col_maps = {}
         col_i = 0
-        self.col_names = []
+        
         for cond in cond_list:
             for level in level_list:
                 if cond not in col_maps.keys():
                     col_maps[cond] = {}
                 col_maps[cond][level] = col_i
                 col_i += 1
-                self.col_names.append(cond + " " + level)
         for root, dirs, files in os.walk(self.data_path, topdown=False):
             for name in files:
                 file_path = os.path.join(root, name)
@@ -146,7 +145,13 @@ class ImageFolder(data.Dataset):
         self.N_EVAL = default_configs["n_eval"]
         self.df = df.reset_index(drop=True)
         self.df = self.df.groupby(['study_id'])
-        self.study_ids = np.unique(df["study_id"].values)
+        temp_list = np.unique(df["study_id"].values)
+        self.study_ids = set()
+        for study_id in temp_list:
+            if len(self.axis_map[study_id]) >= 3:
+                self.study_ids.add(study_id)
+        self.study_ids = list(self.study_ids)
+        
         self.labels = {}
         self.image_sizes = {"sagittal_t2": (default_configs["image_size"], default_configs["image_size"]), 
                             "axial_t2": (default_configs["image_size"], default_configs["image_size"]), 
@@ -221,7 +226,15 @@ class ImageFolder(data.Dataset):
                 
             #     self.labels[study_id] = one_hot_label
             # else:
+            new_label = []
+            for i in range(label.shape[0]):
+                if type(label[i]) == str:
+                    new_label.append(np.array([float(num) for num in label[i].split(' ')]))
+                else:
+                    new_label.append(label[i])
+            label = np.array(new_label)
             self.labels[study_id] = label
+            
         
         
     def __len__(self):
@@ -342,9 +355,6 @@ class ImageFolder(data.Dataset):
             # multiview_heat_map_labels[i_view*self.N_EVAL:(i_view+1)*self.N_EVAL, :] = heat_map_labels
         # multiview_series_stack = multiview_series_stack.transpose(0, 3, 1, 2)
         
-        any_severe_spinal_label = multiview_label[20:].max()
-        if any_severe_spinal_label == 2:
-            any_severe_spinal_label = 1
-        else:
-            any_severe_spinal_label = 0
+        any_severe_spinal_label = 0
+        # print(multiview_label.shape, type(multiview_label), type(any_severe_spinal_label), type(multiview_frame_labels), type(study_id), type(series_stacks["axial_t2"]), type(series_stacks["sagittal_t2"]), type(series_stacks["sagittal_t1"]))
         return series_stacks["axial_t2"], series_stacks["sagittal_t2"], series_stacks["sagittal_t1"], multiview_label, any_severe_spinal_label, multiview_frame_labels, study_id
