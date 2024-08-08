@@ -85,18 +85,26 @@ class Model(nn.Module):
     def __init__(self, back_bone, n_head, device_id):
         super().__init__()
         self.back_bone = back_bone
-
-        self.model0 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
+        
+        if "maxvit" in back_bone or "convnext" in back_bone:
+            self.model0 = timm.create_model(back_bone, pretrained=True, num_classes=3)
+            self.model0.head = nn.Identity()
+        else:
+            self.model0 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
+            self.model0.fc_norm = nn.Identity()
+            self.model0.head_drop = nn.Identity()
+            self.model0.head = nn.Identity()
         self.model0.set_grad_checkpointing()
-        self.model0.fc_norm = nn.Identity()
-        self.model0.head_drop = nn.Identity()
-        self.model0.head = nn.Identity()
-
-        self.model1 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
+        
+        if "maxvit" in back_bone or "convnext" in back_bone:
+            self.model1 = timm.create_model(back_bone, pretrained=True, num_classes=3)
+            self.model1.head = nn.Identity()
+        else:
+            self.model1 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
+            self.model1.fc_norm = nn.Identity()
+            self.model1.head_drop = nn.Identity()
+            self.model1.head = nn.Identity()
         self.model1.set_grad_checkpointing()
-        self.model1.fc_norm = nn.Identity()
-        self.model1.head_drop = nn.Identity()
-        self.model1.head = nn.Identity()
 
 
         # self.model2 = timm.create_model(back_bone, pretrained=True, num_classes=3, dynamic_img_pad=True, dynamic_img_size=True)
@@ -106,9 +114,9 @@ class Model(nn.Module):
         # self.model2.head = nn.Identity()
         feats = 768
         drop = 0.0
-        # self.global_pool0 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
-        # self.global_pool1 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
-        # self.global_pool2 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
+        self.global_pool0 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
+        self.global_pool1 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
+        self.global_pool2 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
         
         lstm_embed = feats * 1
         
@@ -161,8 +169,10 @@ class Model(nn.Module):
         x2 = x2.reshape(bs * N_EVAL, in_chans, h2, w2)
         x = torch.cat([x1, x2], 0)
         # x = (x - self.IMAGENET_DEFAULT_MEAN[None,:, None, None])/self.IMAGENET_DEFAULT_STD[None,:, None, None]
-        features0 = self.model0.forward_features(x0)[:, 0]
-        features = self.model1.forward_features(x)[:, 0]
+        features0 = self.model0.forward_features(x0)
+        features0 = self.global_pool0(features0)
+        features = self.model1.forward_features(x)
+        features = self.global_pool1(features)
         features1 = features[:bs * N_EVAL]
         features2 = features[bs * N_EVAL:]
         # features2 = self.model2.forward_features(x2)[:, 0]
@@ -206,8 +216,10 @@ class Model(nn.Module):
         return volume_logits_3, image_logits
     
 if __name__ == '__main__':
-    model = Model("vit_base_patch14_reg4_dinov2.lvd142m", 25, "cuda:0").cuda()
+    model = Model("convnext_small.fb_in22k_ft_in1k", 25, "cuda:0").cuda()
     print('Number of parameters: {}'.format(
         sum([p.data.nelement() for p in model.parameters()])))
-    x = torch.rand((8, 24, 294, 294, 3)).cuda()
-    print(model(x)[0].shape)
+    x0 = torch.rand((8, 8, 288, 288, 3)).cuda()
+    x1 = torch.rand((8, 8, 288, 288, 3)).cuda()
+    x2 = torch.rand((8, 8, 288, 288, 3)).cuda()
+    print(model(x0, x1, x2)[0].shape)
