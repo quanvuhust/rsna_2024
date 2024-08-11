@@ -70,14 +70,14 @@ class SelfAttentionPooling(nn.Module):
         return x
 
 class Neck(nn.Module):
-    def __init__(self, input_dim, device_id):
+    def __init__(self, input_dim):
         super(Neck, self).__init__()
-        self.lstm = nn.GRU(input_dim, input_dim, num_layers=1, dropout=0.0, bidirectional=True, batch_first=True).to(device_id)
-        self.atten_pool = SelfAttentionPooling(2*input_dim)
+        self.head = nn.Linear(input_dim, input_dim)
+        
         
     def forward(self, x):
-        x, _ = self.lstm(x)
-        x = self.atten_pool(x)
+        x = self.head(x)
+        # x = torch.mean(x, 1)
         return x  
 
 
@@ -114,9 +114,10 @@ class Model(nn.Module):
         # self.model2.head = nn.Identity()
         feats = 768
         drop = 0.0
-        self.global_pool0 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
-        self.global_pool1 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
-        self.global_pool2 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
+        if "convnext" in back_bone:
+            self.global_pool0 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
+            self.global_pool1 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
+            self.global_pool2 = SelectAdaptivePool2d(pool_type='avg', flatten=True, input_fmt="NCHW")
         
         lstm_embed = feats * 1
         
@@ -130,7 +131,6 @@ class Model(nn.Module):
                                     nn.Linear(feats, 1),
                                 ) for i in range(25)]).to(device_id)
         self.volume_heads_3 = nn.ModuleList([nn.Sequential(
-                                    # nn.Dropout(0.1),
                                     SelfAttentionPooling(2*lstm_embed),
                                     nn.Linear(2*lstm_embed, 3),
                                 ) for i in range(n_head)]).to(device_id)
@@ -203,7 +203,7 @@ class Model(nn.Module):
         features = features.reshape(bs * n_slice_per_c, -1)
         # features = self.global_pool(features)
         # print(avg_feat.shape)
-        image_logits = torch.zeros(self.n_head, bs * n_slice_per_c, 1).to(self.device_id)
+        image_logits = torch.zeros(self.n_head, bs * n_slice_per_c, 3).to(self.device_id)
         for i, l in enumerate(self.image_heads):
             image_logits[i] = self.image_heads[i](features)
         

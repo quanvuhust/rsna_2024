@@ -35,12 +35,12 @@ def count_parameters(module):
         sum([p.data.nelement() for p in module.parameters()])))
  
 def scheduler_lr(optimizer, ep, lr):
-    if ep <= 19:
+    if ep <= 15:
         for p in optimizer.param_groups:
             p['lr'] = lr
-    elif ep <= 24:
+    elif ep <= 20:
       for p in optimizer.param_groups:
-            p['lr'] = lr/10
+            p['lr'] = lr/2
     else:
       for p in optimizer.param_groups:
-            p['lr'] = lr/100
+            p['lr'] = lr/10

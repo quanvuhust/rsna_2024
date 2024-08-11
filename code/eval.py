@@ -150,7 +150,7 @@ def eval(val_loader, model, device, epoch, is_ema, default_configs, col_names):
         print("{}. lb loss: ".format(k), lb_loss)
         print("{}. Average loss: ".format(k), total_logloss/(len(col_names)))
         if k == 3:
-            val_metric['loss'] = lb_loss
+            val_metric['loss'] = total_logloss/(len(col_names))
             val_metric['subarticular_loss'] = subarticular_loss
             val_metric['foraminal_loss'] = foraminal_loss
             val_metric['spinal_loss'] = spinal_loss

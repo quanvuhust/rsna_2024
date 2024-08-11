@@ -94,15 +94,30 @@ def load_old_weight(model, weight_path):
         model.load_state_dict(pretrained_dict)
     return model
 
+def load_pretrain(model, weight_path):
+    if weight_path is not None:
+        pretrained_dict = torch.load(weight_path)
+        print(pretrained_dict.keys())
+        # model_dict = model.model0.state_dict()
+        # pretrained_dict0 = {k: v for k, v in pretrained_dict.items() if k in model_dict and v.size() == model_dict[k].size()}
+        # model.model0.load_state_dict(pretrained_dict0)
+        # print("Load success model 0: ")
+        model_dict = model.model1.state_dict()
+        pretrained_dict1 = {k: v for k, v in pretrained_dict.items() if k in model_dict and v.size() == model_dict[k].size()}
+        model.model1.load_state_dict(pretrained_dict1)
+        print("Load success model 1: ")
+
+    return model
+
 class DistanceLoss(nn.Module):
     def __init__(self, device_id):
         super(DistanceLoss, self).__init__()
-        self.loss_x = torch.nn.MSELoss(reduction='none')
-        self.loss_y = torch.nn.MSELoss(reduction='none')
+        self.loss_x = torch.nn.MSELoss()
+        self.loss_y = torch.nn.MSELoss()
         self.device_id = device_id
 
     def forward(self, output, target):
-        return self.loss_x(output[:, 0], target[:, 0]) + self.loss_y(output[:, 1], target[:, 1])
+        return self.loss_x(torch.sigmoid(output[:, 0]), target[:, 0]) + self.loss_y(torch.sigmoid(output[:, 1]), target[:, 1])
 
 def build_criterion(default_configs, device_id):
     coord_criterion = DistanceLoss(device_id).to(device_id)
@@ -112,8 +127,9 @@ def build_criterion(default_configs, device_id):
     heatmap_criterion = FocalLossBCE().to(device_id)
     return coord_criterion, obj_criterion, volume_criterion, any_criterion, heatmap_criterion
 
-def build_net(default_configs, col_names, device_id):
+def build_net(default_configs, col_names, device_id, fold):
     model = Model(default_configs["backbone"], len(col_names), device_id).to(device_id)
+    model = load_pretrain(model, default_configs["pretrain"])
     # load_old_weight(model, weights_path[fold])
     return model
 
@@ -145,7 +161,7 @@ def train_one_fold(fold, train_loader, test_loader, rank, num_tasks, col_names, 
     scaler = torch.cuda.amp.GradScaler()
     weight_path = make_weight_folder(default_configs, axis, fold)
     coord_criterion, obj_criterion, volume_criterion, any_criterion, heatmap_criterion = build_criterion(default_configs, device_id)
-    model = build_net(default_configs, col_names, device_id)
+    model = build_net(default_configs, col_names, device_id, fold)
     if "mobilenetv4" in default_configs["backbone"]:
         model = convert_sync_batchnorm(model)
     

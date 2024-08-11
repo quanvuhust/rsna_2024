@@ -171,6 +171,7 @@ class ImageFolder(data.Dataset):
             normal_aug_list = [
                 A.RandomResizedCrop(height=self.image_sizes[axis][0], width=self.image_sizes[axis][1], scale=(0.7, 1.0), p=1),
                 A.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2), p=0.75),
+                A.Perspective(p=0.75),
                 A.OneOf([
                     A.MotionBlur(blur_limit=5),
                     A.MedianBlur(blur_limit=5),
@@ -189,6 +190,7 @@ class ImageFolder(data.Dataset):
             instance_aug_list = [
                 A.RandomResizedCrop(height=self.image_sizes[axis][0], width=self.image_sizes[axis][1], scale=(0.8, 1.0), p=1),
                 A.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2), p=0.5),
+                A.Perspective(p=0.5),
                 A.OneOf([
                     A.MotionBlur(blur_limit=5),
                     A.MedianBlur(blur_limit=5),
