@@ -1,0 +1,21 @@
+{
+  "a_name": "exp_9",
+  "a_description": "rsna finetune softlabel",
+  "batch_size": 8,
+  "num_workers": 16,
+  "n_eval": 8,
+  "image_size": 512,
+  "accumulation_steps": 1,
+  "smoothing_value": 0.0,
+  "use_mixup": true,
+  "model_ema_decay": 0.999,
+  "start_ema_epoch": 0,
+  "lr": 0.00034,
+  "num_epoch": 15,
+  "weight_decay": 0.01,
+  "mixup_alpha": 0.4,
+  "finetune": false,
+  "softlabel_path": "data/oof_exp_2.csv",
+  "backbone": "convnext_pico_ols.d1_in1k",
+  "optimizer": "schedulefree"
+}

@@ -1,0 +1,21 @@
+{
+  "a_name": "exp_12",
+  "a_description": "rsna 8 eval",
+  "batch_size": 16,
+  "num_workers": 8,
+  "n_eval": 8,
+  "image_size": 384,
+  "accumulation_steps": 1,
+  "smoothing_value": 0.1,
+  "use_mixup": true,
+  "model_ema_decay": 0.999,
+  "start_ema_epoch": 0,
+  "lr": 0.00034,
+  "num_epoch": 16,
+  "weight_decay": 0.001,
+  "mixup_alpha": 0.4,
+  "axis": "sagittal_t2",
+  "pretrain": "label_coordinates_weights/exp_0_pretrain/all/loss_exp_0_pretrain_foldall.pt",
+  "backbone": "convnext_small.fb_in22k_ft_in1k",
+  "optimizer": "schedulefree"
+}

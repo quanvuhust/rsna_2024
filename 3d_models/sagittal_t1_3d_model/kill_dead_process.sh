@@ -1,0 +1,1 @@
+ps aux | grep "python -u code/finetune_soflabel.py" | grep -v grep | awk '{print $2}' | xargs kill -9
